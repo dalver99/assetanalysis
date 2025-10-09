@@ -1,0 +1,5 @@
+---
+alwaysApply: false
+---
+# I'm trying to build a program where I can set a date range, it will fetch multiple price values, visualize them, then perform statistical analysis for those prices to find relations and deviations.
+

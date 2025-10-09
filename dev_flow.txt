@@ -1,0 +1,20 @@
+0. Cursor Rules settings
+#I'm trying to build a program where I can set a date range, it will fetch multiple price values, visualize them, then perform statistical analysis for those prices to find relations and deviations.
+
+1. Library Research - Find what I can use
+
+https://www.perplexity.ai/search/yfinance-what-can-i-view-for-w-0miwTRoeTpe5PaTZxqzM1Q#0
+
+2. Test the API (test.ipynb)
+2.1 test which values I can fetch
+2.2 test visualization
+2.3 test normalization on value
+2.4 test normalization on date (US/KR has no data on weekend)
+
+3. Export preprocessing fn
+
+4. Create a Streamlit UI with it
+
+5. Edit streamlit UI
+
+6. Export data for scalability

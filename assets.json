@@ -1,0 +1,12 @@
+{
+  "assets": [
+    { "symbol": "068270.KS", "name": "Celltrion", "enabled": true },
+    { "symbol": "GC=F", "name": "Gold", "enabled": true },
+    { "symbol": "^IXIC", "name": "Nasdaq", "enabled": true },
+    { "symbol": "^GSPC", "name": "S&P 500", "enabled": true },
+    { "symbol": "BTC-USD", "name": "Bitcoin", "enabled": true },
+    { "symbol": "^TNX", "name": "10Y Treasury Yield", "enabled": true },
+    { "symbol": "^VIX", "name": "VIX", "enabled": true }
+  ]
+}
+
