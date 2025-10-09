@@ -18,3 +18,5 @@ https://www.perplexity.ai/search/yfinance-what-can-i-view-for-w-0miwTRoeTpe5PaTZ
 5. Edit streamlit UI
 
 6. Export data for scalability
+
+7. Prepare statistical analysis on another page

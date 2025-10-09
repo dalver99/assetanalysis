@@ -146,14 +146,6 @@ def main() -> None:
         }
     if not st.session_state.get("do_run"):
         st.info("Adjust controls and click Run to fetch and plot.")
-        # Offer download of current assets config for easy editing
-        try:
-            with open(assets_path, "rb") as f:
-                st.sidebar.download_button(
-                    "Download assets.json", f, file_name="assets.json"
-                )
-        except Exception:
-            pass
         return
 
     # Highlight selection (by display names)
@@ -200,17 +192,127 @@ def main() -> None:
             break
         df["Name"] = symbol_to_display.get(symbol, symbol)
 
-    chart = build_chart(dfs_processed, highlighted)
-    st.altair_chart(chart, use_container_width=True)
+    tab_chart, tab_stats = st.tabs(["Chart", "Statistics"])
 
-    # Export current assets config for easy modification
-    try:
-        with open(assets_path, "rb") as f:
-            st.sidebar.download_button(
-                "Download assets.json", f, file_name="assets.json"
+    with tab_chart:
+        chart = build_chart(dfs_processed, highlighted)
+        st.altair_chart(chart, use_container_width=True)
+
+    with tab_stats:
+        st.subheader("Summary Statistics")
+        # Build a wide DataFrame of normalized close by name
+        wide = {}
+        for df in dfs_processed:
+            if "Name" in df.columns:
+                wide[str(df["Name"].iloc[0])] = df["Close"].astype(float)
+        wide_df = pd.DataFrame(wide)
+
+        # Compute daily returns
+        returns = wide_df.pct_change().dropna(how="all")
+
+        # Annualization factor (approx trading days); for crypto indices use 365, but 252 is fine as a rough standard
+        ann_factor = 252
+
+        # Metrics
+        vol = returns.std() * (ann_factor**0.5)
+        mean_ret = returns.mean() * ann_factor
+        sharpe_like = mean_ret / vol.replace({0: pd.NA})
+
+        # Max drawdown per series
+        def max_drawdown(series: pd.Series) -> float:
+            running_max = series.cummax()
+            drawdown = (series / running_max) - 1.0
+            return float(drawdown.min()) if not drawdown.empty else float("nan")
+
+        mdd = wide_df.apply(max_drawdown)
+
+        # Pack a table
+        summary = pd.DataFrame(
+            {
+                "Annualized Return": mean_ret,
+                "Annualized Volatility": vol,
+                "Sharpe-like": sharpe_like,
+                "Max Drawdown": mdd,
+            }
+        ).sort_index()
+
+        # Formatting for display
+        st.dataframe(
+            summary.style.format(
+                {
+                    "Annualized Return": "{:.2%}",
+                    "Annualized Volatility": "{:.2%}",
+                    "Sharpe-like": "{:.2f}",
+                    "Max Drawdown": "{:.1%}",
+                }
+            ),
+            use_container_width=True,
+        )
+
+        st.subheader("Correlation Matrix (Daily Returns)")
+        corr = returns.corr()
+        # Heatmap with annotations
+        corr_long = (
+            corr.reset_index()
+            .melt(
+                id_vars=corr.index.name or "index",
+                var_name="Asset2",
+                value_name="Correlation",
             )
-    except Exception:
-        pass
+            .rename(columns={corr.index.name or "index": "Asset1"})
+        )
+        heat = (
+            alt.Chart(corr_long)
+            .mark_rect()
+            .encode(
+                x=alt.X("Asset1:N", sort=list(corr.columns)),
+                y=alt.Y("Asset2:N", sort=list(corr.columns)),
+                color=alt.Color(
+                    "Correlation:Q",
+                    scale=alt.Scale(domain=[-1, 1], scheme="redblue"),
+                ),
+                tooltip=[
+                    alt.Tooltip("Asset1:N", title="Asset 1"),
+                    alt.Tooltip("Asset2:N", title="Asset 2"),
+                    alt.Tooltip("Correlation:Q", title="Corr", format=".2f"),
+                ],
+            )
+        )
+        text = (
+            alt.Chart(corr_long)
+            .mark_text(color="black")
+            .encode(
+                x="Asset1:N",
+                y="Asset2:N",
+                text=alt.Text("Correlation:Q", format=".2f"),
+            )
+        )
+        st.altair_chart((heat + text).properties(height=400), use_container_width=True)
+
+        # Rolling 30-day annualized volatility
+        st.subheader("Rolling 30-Day Annualized Volatility")
+        rolling_vol = returns.rolling(30).std() * (ann_factor**0.5)
+        rv = rolling_vol.copy()
+        rv["Date"] = rv.index
+        rv_long = rv.melt(id_vars=["Date"], var_name="Name", value_name="Vol")
+        rv_chart = (
+            alt.Chart(rv_long)
+            .mark_line()
+            .encode(
+                x=alt.X("Date:T", title="Date"),
+                y=alt.Y("Vol:Q", title="Volatility", scale=alt.Scale(zero=False)),
+                color=alt.Color("Name:N", legend=alt.Legend(title="Ticker")),
+                tooltip=[
+                    "Name:N",
+                    alt.Tooltip("Date:T"),
+                    alt.Tooltip("Vol:Q", format=".2%"),
+                ],
+            )
+            .properties(height=300)
+        )
+        st.altair_chart(rv_chart, use_container_width=True)
+
+    # No download buttons
 
 
 if __name__ == "__main__":

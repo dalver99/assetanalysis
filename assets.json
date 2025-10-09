@@ -6,7 +6,11 @@
     { "symbol": "^GSPC", "name": "S&P 500", "enabled": true },
     { "symbol": "BTC-USD", "name": "Bitcoin", "enabled": true },
     { "symbol": "^TNX", "name": "10Y Treasury Yield", "enabled": true },
-    { "symbol": "^VIX", "name": "VIX", "enabled": true }
+    { "symbol": "^VIX", "name": "VIX", "enabled": true },
+    { "symbol": "CL=F", "name": "Oil", "enabled": true },
+    { "symbol": "ZC=F", "name": "Corn Futures", "enabled": true },
+    { "symbol": "USDKRW=X", "name": "Won to Dollar", "enabled": true },
+    { "symbol": "USDCNY=X", "name": "CN Yuan to Dollar", "enabled": true }
   ]
 }
 
