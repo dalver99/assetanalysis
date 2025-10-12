@@ -1,13 +1,14 @@
 # =============================================================
-# Streamlit app to explore ticker time series with highlighting
-# Ensures imports work when launched via Streamlit from the app folder
+# 스트림릿 앱: 자산 시계열 시각화 및 통계 분석
+# - 하이라이트 기능 포함
+# - 앱 폴더에서 실행 시 모듈 임포트를 위해 경로를 설정합니다.
 # =============================================================
 
 import os
 import sys
 from pathlib import Path
 
-# Make project root importable so `utils` can be resolved
+# `utils` 모듈 임포트를 위해 프로젝트 루트를 파이썬 경로에 추가
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -21,7 +22,7 @@ from utils.data_process import fetch_data, preprocess_data
 
 
 def build_chart(dataframes: list[pd.DataFrame], highlighted: set[str]) -> alt.Chart:
-    # Combine into a single long DataFrame for Altair
+    # Altair를 위해 하나의 긴(long) 데이터프레임으로 결합
     long_frames: list[pd.DataFrame] = []
     for df in dataframes:
         if "Name" not in df.columns:
@@ -44,17 +45,17 @@ def build_chart(dataframes: list[pd.DataFrame], highlighted: set[str]) -> alt.Ch
             y=alt.Y(
                 "Close:Q",
                 title="Normalized Close",
-                scale=alt.Scale(zero=False),  # tighten domain; avoid large gap at zero
+                scale=alt.Scale(zero=False),  # 도메인 축소; 0에서 큰 간격 방지
             ),
             color=alt.Color(
                 "Name:N",
-                legend=alt.Legend(title="Ticker"),
+                legend=alt.Legend(title="티커"),
                 scale=alt.Scale(scheme="tableau10"),
             ),
             tooltip=[
                 "Name:N",
                 alt.Tooltip("Date:T", title="Date"),
-                alt.Tooltip("Close:Q", title="Close", format=".3f"),
+                alt.Tooltip("Close:Q", title="종가", format=".3f"),
             ],
         )
     )
@@ -78,7 +79,7 @@ def main() -> None:
     # Sidebar inputs
     st.sidebar.header("Controls")
 
-    # Load asset config from JSON (project root)
+    # JSON(프로젝트 루트)에서 자산 구성 로드
     assets_path = PROJECT_ROOT / "assets.json"
     if assets_path.exists():
         try:
@@ -98,7 +99,7 @@ def main() -> None:
     else:
         default_assets = []
     if not default_assets:
-        # Fallback list if config missing or invalid
+        # 구성 누락 또는 유효하지 않은 경우 기본 목록
         default_assets = [
             ("068270.KS", "Celltrion", True),
             ("GC=F", "Gold", True),
@@ -118,23 +119,21 @@ def main() -> None:
             selected_symbols.append(symbol)
             symbol_to_display[symbol] = friendly
 
-    date_mode = st.sidebar.radio(
-        "Date selection mode", ["Period", "Range"], horizontal=True
-    )
+    date_mode = st.sidebar.radio("날짜 선택 모드", ["Period", "Range"], horizontal=True)
     if date_mode == "Period":
         period = st.sidebar.selectbox(
-            "Period",
+            "기간",
             ["5d", "10d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"],
             index=1,
         )
         start = None
         end = None
     else:
-        start = st.sidebar.date_input("Start date")
-        end = st.sidebar.date_input("End date")
+        start = st.sidebar.date_input("시작 날짜")
+        end = st.sidebar.date_input("종료 날짜")
         period = None
 
-        # Run button to avoid fetching on every control change
+        # 모든 컨트롤 변경 시 가져오기 방지를 위한 실행 버튼
     run_clicked = st.sidebar.button("Run")
     if run_clicked:
         st.session_state["do_run"] = True
@@ -145,19 +144,19 @@ def main() -> None:
             "end": end,
         }
     if not st.session_state.get("do_run"):
-        st.info("Adjust controls and click Run to fetch and plot.")
+        st.info("컨트롤을 조정하고 실행 버튼을 클릭하여 가져오고 차트를 그립니다.")
         return
 
-    # Highlight selection (by display names)
+    # 하이라이트 선택 (표시 이름별)
     st.sidebar.subheader("Highlight")
     highlight_options = [symbol_to_display[s] for s in selected_symbols]
     highlighted = set(
         st.sidebar.multiselect(
-            "Highlight (optional)", options=highlight_options, default=[]
+            "하이라이트 (선택 사항)", options=highlight_options, default=[]
         )
     )
 
-    # Fetch and preprocess
+    # 데이터 가져오기 및 전처리
     with st.spinner("Fetching data..."):
         params = st.session_state.get(
             "run_params",
@@ -177,13 +176,13 @@ def main() -> None:
         )
 
     if not dfs:
-        st.warning("No data fetched. Check tickers or date range.")
+        st.warning("데이터를 가져오지 못했습니다. 티커 또는 날짜 범위를 확인하세요.")
         return
 
-    with st.spinner("Preprocessing..."):
+    with st.spinner("전처리 중..."):
         dfs_processed = preprocess_data(dfs)
 
-    # Apply chosen display names
+    # 선택한 표시 이름 적용
     symbol_iter = iter(selected_symbols)
     for df in dfs_processed:
         try:
@@ -199,7 +198,7 @@ def main() -> None:
         st.altair_chart(chart, use_container_width=True)
 
     with tab_stats:
-        st.subheader("Summary Statistics")
+        st.subheader("요약 통계")
         # Build a wide DataFrame of normalized close by name
         wide = {}
         for df in dfs_processed:
@@ -207,18 +206,18 @@ def main() -> None:
                 wide[str(df["Name"].iloc[0])] = df["Close"].astype(float)
         wide_df = pd.DataFrame(wide)
 
-        # Compute daily returns
+        # 일간 수익 계산
         returns = wide_df.pct_change().dropna(how="all")
 
-        # Annualization factor (approx trading days); for crypto indices use 365, but 252 is fine as a rough standard
+        # 연간화 요인 (약 거래일); 암호화폐 지수의 경우 365를 사용하지만, 252는 근사치로 적합합니다.
         ann_factor = 252
 
-        # Metrics
+        # 지표
         vol = returns.std() * (ann_factor**0.5)
         mean_ret = returns.mean() * ann_factor
         sharpe_like = mean_ret / vol.replace({0: pd.NA})
 
-        # Max drawdown per series
+        # 시리즈당 최대 하락
         def max_drawdown(series: pd.Series) -> float:
             running_max = series.cummax()
             drawdown = (series / running_max) - 1.0
@@ -226,7 +225,7 @@ def main() -> None:
 
         mdd = wide_df.apply(max_drawdown)
 
-        # Pack a table
+        # 테이블 패킹
         summary = pd.DataFrame(
             {
                 "Annualized Return": mean_ret,
@@ -236,7 +235,7 @@ def main() -> None:
             }
         ).sort_index()
 
-        # Formatting for display
+        # 표시 형식 지정
         st.dataframe(
             summary.style.format(
                 {
@@ -249,9 +248,9 @@ def main() -> None:
             use_container_width=True,
         )
 
-        st.subheader("Correlation Matrix (Daily Returns)")
+        st.subheader("상관 행렬 (일간 수익)")
         corr = returns.corr()
-        # Heatmap with annotations
+        # 주석이 있는 히트맵
         corr_long = (
             corr.reset_index()
             .melt(
@@ -289,7 +288,7 @@ def main() -> None:
         )
         st.altair_chart((heat + text).properties(height=400), use_container_width=True)
 
-        # Rolling 30-day annualized volatility
+        # 30일 연간화 변동성
         st.subheader("Rolling 30-Day Annualized Volatility")
         rolling_vol = returns.rolling(30).std() * (ann_factor**0.5)
         rv = rolling_vol.copy()
@@ -311,8 +310,6 @@ def main() -> None:
             .properties(height=300)
         )
         st.altair_chart(rv_chart, use_container_width=True)
-
-    # No download buttons
 
 
 if __name__ == "__main__":
