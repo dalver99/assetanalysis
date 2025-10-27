@@ -1,30 +1,39 @@
-# A full pipeline for preprocessing data that come in an array of dataframes
+# =============================================================
+# 데이터 전처리 파이프라인
+# - 다수의 데이터프레임을 받아 결측 보간, 날짜 인덱스 통합, 종가 정규화 수행
+# =============================================================
 import pandas as pd
 import yfinance as yf
 
 
 def preprocess_data(dataframes: list[pd.DataFrame]) -> list[pd.DataFrame]:
-    # First, forward-fill the data in each DataFrame to fill in any missing values
+    """입력 데이터프레임 배열을 전처리하여 동일한 날짜축과 정규화된 종가로 반환합니다.
+
+    단계:
+    1) 앞/뒤 채우기로 결측치 보간
+    2) 날짜 인덱스 합집합으로 재인덱싱 후 보간
+    3) 첫 유효·비영점 종가 기준으로 정규화
+    """
+    # 각 프레임의 결측을 앞 채우기
     processed = []
     for df in dataframes:
         df_filled = df.ffill()  # Forward fill missing values within each dataframe
-        # Then backward fill to fill in any missing values at the start of the dataframe
+        # 시작 구간 보완을 위해 뒤 채우기
         df_filled = df_filled.bfill()
         processed.append(df_filled)
 
-    # Now, find the union of all dates across all dataframes
+    # 모든 프레임의 날짜 인덱스를 합집합으로 결합
     common_dates = processed[0].index
     for df in processed[1:]:
         common_dates = common_dates.union(df.index)
 
-    # Reindex all dataframes to the common set of dates and apply forward-fill again
+    # 공통 날짜로 재인덱싱 후 다시 앞/뒤 채우기
     final_processed = []
     for df in processed:
         df_new = df.reindex(common_dates).ffill()  # Reindex and ffill missing dates
         # Backfill
         df_new = df_new.bfill()
-        # Normalize the 'Close' column
-        # Normalize 'Close' by dividing by the first non-null, non-zero value
+        # 첫 유효·비영점 종가로 정규화
         valid_close = df_new["Close"].dropna()
         nonzero_close = valid_close[valid_close.ne(0)]
         first_nonzero = nonzero_close.iloc[0] if not nonzero_close.empty else 1.0
@@ -41,10 +50,10 @@ def fetch_data(
     end: str | pd.Timestamp | None = None,
     add_name: bool = True,
 ) -> list[pd.DataFrame]:
-    """Fetch price history for a list of tickers.
+    """티커 목록의 가격 이력을 조회합니다.
 
-    If start (and optional end) are provided, use explicit date range; otherwise use period.
-    Optionally adds a "Name" column with the ticker symbol for downstream plotting.
+    - start/end가 주어지면 해당 구간을, 없으면 period(예: "10d")를 사용합니다.
+    - 시각화를 위해 티커 문자열을 Name 컬럼으로 추가할 수 있습니다.
     """
     dataframes: list[pd.DataFrame] = []
     for ticker in tickers:
