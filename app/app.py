@@ -192,7 +192,7 @@ def main() -> None:
             break
         df["Name"] = symbol_to_display.get(symbol, symbol)
 
-    tab_chart, tab_stats = st.tabs(["Chart", "Statistics"])
+    tab_chart, tab_stats, tab_div = st.tabs(["Chart", "Statistics", "Division"])
 
     with tab_chart:
         chart = build_chart(dfs_processed, highlighted)
@@ -312,7 +312,126 @@ def main() -> None:
         )
         st.altair_chart(rv_chart, use_container_width=True)
 
-    # No download buttons
+    with tab_div:
+        st.subheader("Price Ratio (Division)")
+        # Build wide DataFrame of normalized close
+        wide = {}
+        for df in dfs_processed:
+            if "Name" in df.columns:
+                wide[str(df["Name"].iloc[0])] = df["Close"].astype(float)
+        wide_df = pd.DataFrame(wide)
+
+        if wide_df.shape[1] < 2:
+            st.info("Select at least two assets to compute a ratio.")
+        else:
+            names = list(wide_df.columns)
+            col1, col2 = st.columns(2)
+            with col1:
+                asset_a = st.selectbox("Asset A (numerator)", options=names, index=0)
+            with col2:
+                asset_b = st.selectbox(
+                    "Asset B (denominator)",
+                    options=names,
+                    index=1 if len(names) > 1 else 0,
+                )
+
+            # Determine available date range for both series
+            pair = wide_df[[asset_a, asset_b]].dropna(how="any")
+            if pair.empty:
+                st.warning("No overlapping dates between the selected assets.")
+            else:
+                min_date = pair.index.min().date()
+                max_date = pair.index.max().date()
+                r1, r2 = st.columns(2)
+                with r1:
+                    dr_start = st.date_input(
+                        "Start date",
+                        value=min_date,
+                        min_value=min_date,
+                        max_value=max_date,
+                    )
+                with r2:
+                    dr_end = st.date_input(
+                        "End date",
+                        value=max_date,
+                        min_value=min_date,
+                        max_value=max_date,
+                    )
+
+                if dr_start > dr_end:
+                    st.warning("Start date must be on or before end date.")
+                else:
+                    mask = (pair.index.date >= dr_start) & (pair.index.date <= dr_end)
+                    sub = pair.loc[mask]
+                    if sub.empty:
+                        st.warning("No data in the selected date range.")
+                    else:
+                        ratio = (sub[asset_a] / sub[asset_b]).rename(
+                            f"{asset_a} / {asset_b}"
+                        )
+                        ratio_df = ratio.to_frame(name="Ratio").copy()
+                        ratio_df["Date"] = ratio_df.index
+
+                        base = (
+                            alt.Chart(ratio_df)
+                            .mark_line(color="#d62728", strokeWidth=2.5)
+                            .encode(
+                                x=alt.X("Date:T", title="Date"),
+                                y=alt.Y(
+                                    "Ratio:Q",
+                                    title="Price Ratio",
+                                    scale=alt.Scale(zero=False),
+                                ),
+                                tooltip=[
+                                    alt.Tooltip("Date:T", title="Date"),
+                                    alt.Tooltip("Ratio:Q", title="Ratio", format=".3f"),
+                                ],
+                            )
+                        )
+
+                        # Reference line at 1.0
+                        ref = (
+                            alt.Chart(pd.DataFrame({"y": [1]}))
+                            .mark_rule(color="gray", strokeDash=[4, 4])
+                            .encode(y="y:Q")
+                        )
+
+                        # Overlay original asset prices (normalized) as background
+                        prices = sub.copy()
+                        prices["Date"] = prices.index
+                        prices_long = prices.melt(
+                            id_vars=["Date"], var_name="Name", value_name="Price"
+                        )
+                        price_layer = (
+                            alt.Chart(prices_long)
+                            .mark_line(opacity=0.35)
+                            .encode(
+                                x=alt.X("Date:T", title="Date"),
+                                y=alt.Y(
+                                    "Price:Q",
+                                    title="Normalized Price",
+                                    scale=alt.Scale(zero=False),
+                                ),
+                                color=alt.Color(
+                                    "Name:N", legend=alt.Legend(title="Assets")
+                                ),
+                                tooltip=[
+                                    "Name:N",
+                                    alt.Tooltip("Date:T", title="Date"),
+                                    alt.Tooltip("Price:Q", title="Price", format=".3f"),
+                                ],
+                            )
+                        )
+
+                        ratio_layer = base + ref
+
+                        combined = (
+                            alt.layer(price_layer, ratio_layer)
+                            .resolve_scale(y="independent")
+                            .properties(height=400)
+                        )
+
+                        st.altair_chart(combined, use_container_width=True)
 
 
 if __name__ == "__main__":

@@ -20,3 +20,7 @@ https://www.perplexity.ai/search/yfinance-what-can-i-view-for-w-0miwTRoeTpe5PaTZ
 6. Export data for scalability
 
 7. Prepare statistical analysis on another page
+
+8. Added Asset division with two prompts - 
+- add a division on a new tab
+- add highlighting for underlying assets
