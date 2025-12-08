@@ -25,7 +25,7 @@ from app.ui import (
     gate_run_and_params,
     apply_display_names,
 )
-from app.charts import build_chart, render_statistics_tab, render_division_tab
+from app.charts import build_chart, render_statistics_tab, render_division_tab, render_candlestick_tab
 
 
 def load_assets_config(project_root: Path) -> list[tuple[str, str, bool]]:
@@ -430,10 +430,15 @@ def main() -> None:
     with st.spinner("Preprocessing..."):
         dfs_processed = preprocess_data(dfs)
 
-    # Apply chosen display names
+    # Apply chosen display names to processed data
     apply_display_names(dfs_processed, selected_symbols, symbol_to_display)
 
-    tab_chart, tab_stats, tab_div = st.tabs(["Chart", "Statistics", "Division"])
+    # Also apply display names to raw data for candlestick tab
+    apply_display_names(dfs, selected_symbols, symbol_to_display)
+
+    tab_chart, tab_stats, tab_div, tab_candle = st.tabs(
+        ["Chart", "Statistics", "Division", "Candlestick"]
+    )
 
     with tab_chart:
         chart = build_chart(dfs_processed, highlighted)
@@ -444,6 +449,9 @@ def main() -> None:
 
     with tab_div:
         render_division_tab(dfs_processed)
+
+    with tab_candle:
+        render_candlestick_tab(dfs, symbol_to_display)
 
 
 if __name__ == "__main__":
